@@ -1,0 +1,9 @@
+{
+  "task_id": "counter",
+  "source_lang": "java",
+  "target_lang": "python",
+  "module_name": "counter",
+  "source_filename": "Counter.java",
+  "source_test_filename": "CounterTest.java",
+  "oracle_filename": "oracle_counter.py"
+}
