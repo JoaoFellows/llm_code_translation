@@ -12,6 +12,10 @@ Make sure to have a suitable Python environment in place. We used Python 3.10. T
 
 ```pip3 install -r requirements.txt```
 
+## Repository translation
+
+Repository-level translation and RepoTransBench evaluation are documented in [`repo_translation/README.md`](repo_translation/README.md).
+
 ## Structure
 `config.py` steers the steps to be executed in the pipeline. Currently, we support [CodeNet](https://github.com/IBM/Project_CodeNet), [Avatar](https://github.com/wasiahmad/AVATAR), [EvalPlus](https://github.com/evalplus/evalplus) and [EvoEval](https://github.com/evo-eval/evoeval) as datasets. Further datasets can be added by adapting the `config.py`, `constants.py` and `prepare_dataset.py`.
 
@@ -35,4 +39,4 @@ For the iterative repair and backtranslations, ensure that intermediate results 
 ### Code smell detection and testing
 Adapt the config in dependence on the steps to be executed. We execute both the code smell detection and the test suit in a Docker environment. The docker container is built from `ubuntu:22.04` and Python, Java, Scala, Rust, and PyLint, PMD, Scalastyle, and Clippy need to be installed.
 
-Then, `main.py` can be used to trigger the code smell detection and / or the test suit execution. The image name needs to passed in `main.py` accordingly. 
+Then, `main.py` can be used to trigger the code smell detection and / or the test suit execution. The image name needs to passed in `main.py` accordingly.

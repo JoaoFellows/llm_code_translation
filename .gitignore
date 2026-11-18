@@ -4,3 +4,4 @@ pytest-cache-files-*/
 __pycache__/
 *.py[cod]
 class_translation/tools/
+repo_translation/results/
