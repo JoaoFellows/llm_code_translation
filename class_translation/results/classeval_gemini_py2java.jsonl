@@ -1,0 +1,1 @@
+{"provider": "gemini", "model": "gemini-3.5-flash-lite", "elapsed_s": 14.8, "task_id": "AvgPartition", "tests_passed": 12, "tests_total": 12, "status": "passed", "smells_after_translation": 0, "smells_after_correction": 0, "smells_after_smell_graph": 0, "correction_iterations": 0, "smell_iterations": 0}
