@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from repo_translation.benchmark import load_projects
-from repo_translation.evaluation import SmellResult, TestResult as BenchmarkTestResult, run_benchmark_tests
+from repo_translation.evaluation import TestResult as BenchmarkTestResult, parse_test_counts, run_benchmark_tests
 from repo_translation.pipeline import _parse_edits, run_project
 
 
@@ -43,25 +43,22 @@ def test_loads_benchmark_and_rejects_test_edits(tmp_path):
                      tmp_path, "Python")
 
 
-def test_repairs_then_rolls_back_failing_smell_refactor(tmp_path, monkeypatch):
+@pytest.mark.parametrize("code,expected_status", [("correct", "passed"), ("buggy", "failed")])
+def test_translates_once_and_runs_tests_once(tmp_path, monkeypatch, code, expected_status):
     project = dataset(tmp_path)
+    calls = []
     def fake_tests(root, workdir, image):
-        code = (workdir / "src" / "example.py").read_text(encoding="utf-8")
-        return BenchmarkTestResult("correct" in code and "broken" not in code,
-                                   0 if "correct" in code and "broken" not in code else 1, "test feedback")
-    def fake_smells(workdir, target):
-        code = (workdir / "src" / "example.py").read_text(encoding="utf-8")
-        return SmellResult(0 if "clean" in code else 2, "unused-variable")
+        calls.append(workdir)
+        translated = (workdir / "src" / "example.py").read_text(encoding="utf-8")
+        ok = translated == "correct"
+        return BenchmarkTestResult(ok, 0 if ok else 1, "test feedback", 2 if ok else 1, 2)
     monkeypatch.setattr("repo_translation.pipeline.run_benchmark_tests", fake_tests)
-    monkeypatch.setattr("repo_translation.pipeline.count_repository_smells", fake_smells)
-    client = FakeClient("buggy", "correct smelly", "broken clean", "correct clean")
-    record = run_project(project, tmp_path, tmp_path / "translated_projects", client, "fake-image",
-                         max_corrections=1, max_smell_iterations=2)
-    assert record.status == "passed"
-    assert record.correction_iterations == 1
-    assert record.smell_iterations == 2
-    assert (record.smells_after_translation, record.smells_after_correction, record.smells_after_smell_loop) == (2, 2, 0)
-    assert (Path(record.workdir) / "src" / "example.py").read_text(encoding="utf-8") == "correct clean"
+    client = FakeClient(code)
+    record = run_project(project, tmp_path, tmp_path / "translated_projects", client, "fake-image")
+    assert record.status == expected_status
+    assert len(calls) == 1
+    assert record.test_pass_rate == (100.0 if code == "correct" else 50.0)
+    assert (Path(record.workdir) / "src" / "example.py").read_text(encoding="utf-8") == code
 
 
 def test_runs_benchmark_script_in_project_container(tmp_path, monkeypatch):
@@ -82,3 +79,15 @@ def test_runs_benchmark_script_in_project_container(tmp_path, monkeypatch):
     assert result.passed
     assert calls[0][-3:] == ["benchmark-image", "bash", "run_tests.sh"]
     assert "/workspace/translated_projects/Java/Python/example" in calls[0]
+
+
+@pytest.mark.parametrize("output,exit_code,expected", [
+    ("=== 2 passed, 1 failed in 0.4s ===", 1, (2, 3)),
+    ("=== 2 passed, 1 skipped in 0.4s ===", 0, (2, 2)),
+    ("Tests run: 4, Failures: 1, Errors: 0, Skipped: 0", 1, (3, 4)),
+    ("Tests run: 4, Failures: 0, Errors: 0, Skipped: 1", 0, (3, 3)),
+    ("test result: ok. 3 passed; 0 failed; 0 ignored", 0, (3, 3)),
+    ("unknown runner output", 0, (None, None)),
+])
+def test_parse_only_explicit_counts(output, exit_code, expected):
+    assert parse_test_counts(output, exit_code) == expected
