@@ -9,7 +9,7 @@ from class_translation.extract import extract_code
 from class_translation.prompts import repair_messages
 from class_translation.providers import ChatClient
 from class_translation.state import MAX_CORRECTION_ITERATIONS, ClassTask
-from class_translation.testing import run_unittest
+from class_translation.testing import run_target_tests
 
 
 class CorrectionState(TypedDict):
@@ -39,7 +39,12 @@ class CorrectionResult:
 
 def build_correction_graph(client: ChatClient, task: ClassTask):
     def run_tests(state: CorrectionState) -> dict[str, object]:
-        report = run_unittest(state["code"], state["oracle_tests"], state["module_name"])
+        report = run_target_tests(
+            state["code"],
+            state["oracle_tests"],
+            state["module_name"],
+            task.target_lang,
+        )
         status = "passed" if report.ok else "failed"
         return {
             "passed": report.passed,

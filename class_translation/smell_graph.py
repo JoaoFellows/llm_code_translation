@@ -10,7 +10,7 @@ from class_translation.prompts import smell_messages
 from class_translation.providers import ChatClient
 from class_translation.smells import count_smells
 from class_translation.state import MAX_SMELL_ITERATIONS, ClassTask
-from class_translation.testing import run_unittest
+from class_translation.testing import run_target_tests
 
 
 class SmellState(TypedDict):
@@ -54,7 +54,12 @@ def build_smell_graph(client: ChatClient, task: ClassTask):
         }
 
     def evaluate(state: SmellState) -> dict[str, object]:
-        tests = run_unittest(state["code"], state["oracle_tests"], state["module_name"])
+        tests = run_target_tests(
+            state["code"],
+            state["oracle_tests"],
+            state["module_name"],
+            task.target_lang,
+        )
         smells = count_smells(state["code"], state["module_name"])
         accepted = tests.ok and smells.count < state["previous_smell_count"]
         if accepted:
