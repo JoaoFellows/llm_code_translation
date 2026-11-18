@@ -8,7 +8,7 @@ from pathlib import Path
 
 from class_translation.providers import ChatClient
 from repo_translation.benchmark import Project
-from repo_translation.evaluation import EXTENSIONS, code_files, run_benchmark_tests
+from repo_translation.evaluation import EXTENSIONS, code_files, count_repository_smells, run_benchmark_tests
 
 
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
@@ -56,6 +56,15 @@ def _apply(edits: dict[Path, str]) -> None:
         path.write_text(content, encoding="utf-8")
 
 
+def _restore(before: dict[Path, str | None], edits: dict[Path, str]) -> None:
+    for path in edits:
+        old = before[path]
+        if old is None:
+            path.unlink()
+        else:
+            path.write_text(old, encoding="utf-8")
+
+
 def _files_context(root: Path, language: str, limit: int = 30000) -> str:
     blocks = []
     size = 0
@@ -99,9 +108,11 @@ class RepositoryRecord:
     target_language: str
     status: str
     test_exit_code: int | None
-    tests_passed: int | None
-    tests_total: int | None
-    test_pass_rate: float | None
+    correction_iterations: int
+    smell_iterations: int
+    smells_after_translation: int | None
+    smells_after_correction: int | None
+    smells_after_smell_loop: int | None
     test_feedback: str
     workdir: str
 
@@ -110,7 +121,9 @@ class RepositoryRecord:
 
 
 def run_project(project: Project, dataset_root: Path, output_root: Path, client: ChatClient,
-                docker_image: str) -> RepositoryRecord:
+                docker_image: str, max_corrections: int = 3, max_smell_iterations: int = 3) -> RepositoryRecord:
+    if max_corrections < 0 or max_smell_iterations < 0:
+        raise ValueError("Iteration limits must be nonnegative")
     root = dataset_root.resolve()
     workdir = (output_root / project.source_language / project.target_language / project.name).resolve()
     workdir.relative_to(root)  # Docker mounts the whole benchmark workspace.
@@ -135,10 +148,45 @@ def run_project(project: Project, dataset_root: Path, output_root: Path, client:
         _apply(edits)
         signatures.append("\n".join(path.relative_to(workdir).as_posix() for path in edits))
 
+    initial_smells = count_repository_smells(workdir, project.target_language)
     tests = run_benchmark_tests(root, workdir, docker_image)
+    correction_iterations = 0
+    while not tests.passed and correction_iterations < max_corrections:
+        prompt = (f"Repair the translated {project.target_language} repository {project.name}.\n"
+                  f"Source files:\n{_files_context(project.source_dir, project.source_language, 10000)}\n"
+                  f"Target files:\n{_files_context(workdir, project.target_language)}\n"
+                  f"Target build configs:\n{_config_context(workdir)}\n"
+                  f"Test command: bash run_tests.sh\nExit code: {tests.exit_code}\nFeedback:\n{tests.output[-8000:]}\n"
+                  "Return only the complete files that need to change.")
+        _apply(_ask(client, prompt, workdir, project.target_language))
+        correction_iterations += 1
+        tests = run_benchmark_tests(root, workdir, docker_image)
+
+    corrected_smells = count_repository_smells(workdir, project.target_language)
+    current_smells = corrected_smells
+    smell_iterations = 0
+    while tests.passed and current_smells is not None and current_smells.count > 0 and smell_iterations < max_smell_iterations:
+        prompt = (f"Reduce {project.target_language} code smells in repository {project.name} without changing behavior.\n"
+                  f"Target files:\n{_files_context(workdir, project.target_language)}\n"
+                  f"Current smell count: {current_smells.count}\nLinter feedback:\n{current_smells.feedback}\n"
+                  "Return only complete changed files. The benchmark tests must still pass.")
+        edits = _ask(client, prompt, workdir, project.target_language)
+        before = {path: path.read_text(encoding="utf-8") if path.exists() else None for path in edits}
+        _apply(edits)
+        candidate_tests = run_benchmark_tests(root, workdir, docker_image)
+        candidate_smells = count_repository_smells(workdir, project.target_language)
+        smell_iterations += 1
+        if candidate_tests.passed and candidate_smells is not None and candidate_smells.count < current_smells.count:
+            tests, current_smells = candidate_tests, candidate_smells
+        else:
+            _restore(before, edits)
+
     return RepositoryRecord(
         project.name, project.source_language, project.target_language,
         "passed" if tests.passed else "failed", tests.exit_code,
-        tests.tests_passed, tests.tests_total, tests.pass_rate,
+        correction_iterations, smell_iterations,
+        initial_smells.count if initial_smells else None,
+        corrected_smells.count if corrected_smells else None,
+        current_smells.count if current_smells else None,
         tests.output[-4000:], str(workdir),
     )

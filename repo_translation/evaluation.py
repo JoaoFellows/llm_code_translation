@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-import re
+import json
+import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+from class_translation.smells import count_target_smells
+
 
 EXTENSIONS = {
     "Python": (".py",), "Java": (".java",), "Go": (".go",),
@@ -30,53 +35,6 @@ class TestResult:
     passed: bool
     exit_code: int | None
     output: str
-    tests_passed: int | None = None
-    tests_total: int | None = None
-
-    @property
-    def pass_rate(self) -> float | None:
-        if self.tests_total is None or self.tests_total == 0 or self.tests_passed is None:
-            return None
-        return round(100 * self.tests_passed / self.tests_total, 2)
-
-
-def parse_test_counts(output: str, exit_code: int) -> tuple[int | None, int | None]:
-    # Use only explicit runner summaries; a successful process is not a test count.
-    maven = re.findall(r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+)(?:,\s*Skipped:\s*(\d+))?", output)
-    if maven:
-        total, failures, errors = map(int, maven[-1][:3])
-        total -= int(maven[-1][3] or 0)
-        failed = failures + errors
-        return max(0, total - failed), total
-    cargo = re.findall(r"test result:\s*(?:ok|FAILED)\.\s*(\d+) passed;\s*(\d+) failed", output)
-    if cargo:
-        passed = sum(int(item[0]) for item in cargo)
-        failed = sum(int(item[1]) for item in cargo)
-        return passed, passed + failed
-    jest = re.findall(r"Tests:\s*(?:(\d+) failed,?\s*)?(?:(\d+) passed,?\s*)?(\d+) total", output)
-    if jest:
-        failed, passed, total = jest[-1]
-        return int(passed or 0), int(total)
-    pytest_summaries = re.findall(r"^=+\s*([^\n]*\b(?:passed|failed|error|errors)\b[^\n]*)\s*=+\s*$", output, re.MULTILINE)
-    if pytest_summaries:
-        summary = pytest_summaries[-1]
-        passed = re.search(r"(\d+) passed", summary)
-        failed = re.search(r"(\d+) failed", summary)
-        errors = re.search(r"(\d+) errors?", summary)
-        skipped = re.search(r"(\d+) skipped", summary)
-        values = [int(x.group(1)) if x else 0 for x in (passed, failed, errors, skipped)]
-        if any(values):
-            return values[0], sum(values[:3])
-    unittest = re.search(r"Ran (\d+) tests? in [^\n]+", output)
-    if unittest:
-        total = int(unittest.group(1))
-        if exit_code == 0:
-            return total, total
-        failures = re.search(r"failures=(\d+)", output)
-        errors = re.search(r"errors=(\d+)", output)
-        if failures or errors:
-            return max(0, total - int(failures.group(1) if failures else 0) - int(errors.group(1) if errors else 0)), total
-    return None, None
 
 
 def run_benchmark_tests(dataset_root: Path, workdir: Path, image: str, timeout: int = 600) -> TestResult:
@@ -96,5 +54,47 @@ def run_benchmark_tests(dataset_root: Path, workdir: Path, image: str, timeout: 
     except subprocess.TimeoutExpired as error:
         return TestResult(False, None, f"Test timeout after {timeout}s: {error}")
     output = (completed.stdout + "\n" + completed.stderr)[-12000:]
-    passed, total = parse_test_counts(output, completed.returncode)
-    return TestResult(completed.returncode == 0, completed.returncode, output, passed, total)
+    return TestResult(completed.returncode == 0, completed.returncode, output)
+
+
+@dataclass(frozen=True)
+class SmellResult:
+    count: int
+    feedback: str
+
+
+def count_repository_smells(workdir: Path, target_language: str) -> SmellResult | None:
+    if target_language not in {"Python", "Java"}:
+        return None
+    paths = code_files(workdir, target_language, exclude_tests=True)
+    if not paths:
+        raise ValueError(f"No {target_language} source files to evaluate in {workdir}")
+    if target_language == "Python":
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(workdir)
+        env["PYTHONIOENCODING"] = "utf-8"
+        completed = subprocess.run(
+            [sys.executable, "-m", "pylint", "--output-format=json", "--score=n",
+             *(str(path.relative_to(workdir)) for path in paths)],
+            cwd=workdir, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=120, check=False, env=env,
+        )
+        if completed.returncode & 32:
+            raise RuntimeError(f"Pylint could not analyze repository: {completed.stderr[-2000:]}")
+        try:
+            messages = json.loads(completed.stdout)
+        except json.JSONDecodeError as error:
+            raise RuntimeError(f"Pylint did not produce JSON: {completed.stderr[-2000:]}") from error
+        if not isinstance(messages, list):
+            raise RuntimeError("Pylint returned an unexpected result")
+        lines = [f"{item.get('path', '')}: {item.get('symbol', '')}: {item.get('message', '')}"
+                 for item in messages if isinstance(item, dict)]
+        return SmellResult(len(lines), "\n".join(lines)[:12000])
+    total = 0
+    feedback = []
+    for path in paths:
+        report = count_target_smells(path.read_text(encoding="utf-8"), path.stem, target_language.lower())
+        total += report.count
+        if report.feedback:
+            feedback.append(f"{path.relative_to(workdir).as_posix()}: {report.feedback}")
+    return SmellResult(total, "\n".join(feedback)[:12000])

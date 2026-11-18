@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from class_translation.providers import PRESETS, build_client
+from class_translation.smells import pmd_executable
 from repo_translation.benchmark import load_projects
 from repo_translation.pipeline import run_project
 
@@ -18,6 +19,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source", help="Filter source language")
     parser.add_argument("--target", help="Filter target language")
     parser.add_argument("--max-per-pair", type=int, default=1)
+    parser.add_argument("--max-corrections", type=int, default=3)
+    parser.add_argument("--max-smell-iterations", type=int, default=3)
     args = parser.parse_args(argv)
     if args.max_per_pair < 1:
         parser.error("--max-per-pair must be positive")
@@ -39,6 +42,8 @@ def main(argv: list[str] | None = None) -> int:
                            capture_output=True, text=True, check=False)
     if image.returncode != 0:
         raise RuntimeError(f"Docker image unavailable: {args.docker_image}\n{image.stderr[-1000:]}")
+    if any(p.target_language == "Java" for p in selected) and pmd_executable() is None:
+        raise FileNotFoundError("PMD 7.1.0 is required for Java targets; see class_translation/README.md")
     client = build_client(args.provider)
     output = root / "translated_projects" / args.provider
     failures = 0
@@ -52,7 +57,8 @@ def main(argv: list[str] | None = None) -> int:
             raise FileExistsError(f"Incomplete run at {destination}; move it before resuming")
         print(f"{index}/{len(selected)} {project.name} {project.source_language}->{project.target_language}", flush=True)
         try:
-            record = run_project(project, root, output, client, args.docker_image)
+            record = run_project(project, root, output, client, args.docker_image,
+                                 args.max_corrections, args.max_smell_iterations)
             result = record.to_dict()
             if record.status != "passed":
                 failures += 1
@@ -64,30 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         result_file.parent.mkdir(parents=True, exist_ok=True)
         result_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps(result, ensure_ascii=False), flush=True)
-    results = []
-    for project in selected:
-        path = output / project.source_language / project.target_language / f"{project.name}.result.json"
-        results.append(json.loads(path.read_text(encoding="utf-8")))
-    evaluated = [row for row in results if row.get("status") in {"passed", "failed"}]
-    passed = sum(row["status"] == "passed" for row in evaluated)
-    counted = [row for row in evaluated if isinstance(row.get("tests_passed"), int)
-               and isinstance(row.get("tests_total"), int) and row["tests_total"] > 0]
-    tests_passed = sum(row["tests_passed"] for row in counted)
-    tests_total = sum(row["tests_total"] for row in counted)
-    summary = {
-        "selected_projects": len(selected),
-        "evaluated_projects": len(evaluated),
-        "passed_projects": passed,
-        "project_success_rate": round(100 * passed / len(evaluated), 2) if evaluated else None,
-        "projects_with_test_counts": len(counted),
-        "tests_passed": tests_passed if counted else None,
-        "tests_total": tests_total if counted else None,
-        "test_pass_rate": round(100 * tests_passed / tests_total, 2) if tests_total else None,
-    }
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
-    return 1 if failures or any(row.get("status") != "passed" for row in results) else 0
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

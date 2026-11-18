@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from class_translation.providers import PRESETS, build_client
+from class_translation.smells import pmd_executable
 from repo_translation.benchmark import load_projects, select_project
 from repo_translation.pipeline import run_project
 
@@ -22,6 +23,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider", choices=sorted(PRESETS), default="openai")
     parser.add_argument("--docker-image", required=True, help="Image with benchmark test dependencies")
     parser.add_argument("--output-root", type=Path, help="Must be inside dataset-root; default translated_projects/<provider>")
+    parser.add_argument("--max-corrections", type=int, default=3)
+    parser.add_argument("--max-smell-iterations", type=int, default=3)
     args = parser.parse_args(argv)
 
     root = args.dataset_root.resolve()
@@ -35,8 +38,11 @@ def main(argv: list[str] | None = None) -> int:
                            capture_output=True, text=True, check=False)
     if image.returncode != 0:
         raise RuntimeError(f"Docker image unavailable: {args.docker_image}\n{image.stderr[-1000:]}")
+    if args.target == "Java" and pmd_executable() is None:
+        raise FileNotFoundError("PMD 7.1.0 is required for Java smell evaluation; see class_translation/README.md")
     client = build_client(args.provider)
-    record = run_project(project, root, output, client, args.docker_image)
+    record = run_project(project, root, output, client, args.docker_image,
+                         args.max_corrections, args.max_smell_iterations)
     result_path = Path(record.workdir).parent / f"{project.name}.result.json"
     result_path.write_text(json.dumps(record.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(record.to_dict(), ensure_ascii=False, indent=2))
