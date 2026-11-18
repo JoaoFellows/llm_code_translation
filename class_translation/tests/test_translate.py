@@ -59,6 +59,18 @@ def test_translate_prompt_asks_for_the_target_language_class():
     assert code.startswith("public class Box")
 
 
+def test_translate_python_box_asks_for_java_class():
+    task = load_task(Path(__file__).resolve().parents[1] / "fixtures" / "box")
+    client = ScriptedChatClient(["```java\npackage org.example;\npublic class Box {}\n```"])
+    code = translate_class(task, client)
+    prompt = client.prompts[0][-1]["content"]
+    assert "class Box" in prompt
+    assert "assertEqual" in prompt
+    assert "Print only the java class." in prompt
+    assert "Print only the Python class." not in prompt
+    assert code.startswith("package org.example;")
+
+
 def test_smell_prompt_names_the_target_linter():
     java_prompt = smell_messages(JAVA_TASK, "public class Box {}", "unused")[-1]["content"]
     python_prompt = smell_messages(load_task(FIXTURE), "class Counter: pass", "unused")[-1]["content"]

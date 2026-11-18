@@ -46,3 +46,68 @@ class Counter:
     def getValue(self) -> int:
         return self.value
 """
+
+BOX_BUGGY = """\
+package org.example;
+
+public class Box {
+    private int value;
+
+    public void add(int amount) {
+        this.value = amount;
+    }
+
+    public int getValue() {
+        return this.value;
+    }
+}
+"""
+
+BOX_SMELLY = """\
+package org.example;
+
+public class Box {
+    private int value;
+    private int unusedField;
+
+    public void add(int amount) {
+        this.value += amount;
+    }
+
+    public int getValue() {
+        return this.value;
+    }
+}
+"""
+
+BOX_CLEAN = """\
+package org.example;
+
+public class Box {
+    private int value;
+
+    public void add(int amount) {
+        this.value += amount;
+    }
+
+    public int getValue() {
+        return this.value;
+    }
+}
+"""
+
+BOX_BROKEN = """\
+package org.example;
+
+public class Box {
+    private int value;
+
+    public void add(int amount) {
+        this.value = 0;
+    }
+
+    public int getValue() {
+        return this.value;
+    }
+}
+"""

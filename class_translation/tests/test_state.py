@@ -5,6 +5,7 @@ import pytest
 from class_translation.state import ClassTask, ensure_java_to_python, load_task
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "counter"
+BOX = Path(__file__).resolve().parents[1] / "fixtures" / "box"
 
 
 def test_load_counter_fixture():
@@ -14,6 +15,15 @@ def test_load_counter_fixture():
     assert "class Counter" in task.source_code
     assert "assertEquals" in task.source_tests
     assert "unittest" in task.oracle_tests
+
+
+def test_load_box_fixture():
+    task = load_task(BOX)
+    assert task.task_id == "box"
+    assert (task.source_lang, task.target_lang) == ("python", "java")
+    assert "class Box" in task.source_code
+    assert "assertEqual" in task.source_tests
+    assert "assertEquals" in task.oracle_tests
 
 
 def test_reverse_direction_is_representable_and_refused():

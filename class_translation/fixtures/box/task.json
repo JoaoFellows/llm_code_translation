@@ -1,0 +1,9 @@
+{
+  "task_id": "box",
+  "source_lang": "python",
+  "target_lang": "java",
+  "module_name": "Box",
+  "source_filename": "Box.py",
+  "source_test_filename": "test_box.py",
+  "oracle_filename": "BoxTest.java"
+}
