@@ -5,7 +5,7 @@ from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from class_translation.extract import extract_python
+from class_translation.extract import extract_code
 from class_translation.prompts import smell_messages
 from class_translation.providers import ChatClient
 from class_translation.smells import count_smells
@@ -49,7 +49,7 @@ def build_smell_graph(client: ChatClient, task: ClassTask):
         return {
             "previous_code": state["code"],
             "previous_smell_count": state["smell_count"],
-            "code": extract_python(client.complete(messages)),
+            "code": extract_code(client.complete(messages), task.target_lang),
             "iterations": state["iterations"] + 1,
         }
 

@@ -5,7 +5,7 @@ from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from class_translation.extract import extract_python
+from class_translation.extract import extract_code
 from class_translation.prompts import repair_messages
 from class_translation.providers import ChatClient
 from class_translation.state import MAX_CORRECTION_ITERATIONS, ClassTask
@@ -51,7 +51,7 @@ def build_correction_graph(client: ChatClient, task: ClassTask):
     def repair(state: CorrectionState) -> dict[str, object]:
         messages = repair_messages(task, state["code"], state["feedback"])
         return {
-            "code": extract_python(client.complete(messages)),
+            "code": extract_code(client.complete(messages), task.target_lang),
             "iterations": state["iterations"] + 1,
         }
 

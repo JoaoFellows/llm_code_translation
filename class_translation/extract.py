@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import re
 
-_FENCE = re.compile(r"```(?:python)?\s*([\s\S]*?)```", re.IGNORECASE)
+
+def extract_code(text: str, target_lang: str) -> str:
+    language = re.escape(target_lang)
+    tagged = re.compile(
+        rf"```{language}[^\n]*\n([\s\S]*?)```",
+        re.IGNORECASE,
+    )
+    bare = re.compile(r"```[ \t]*\r?\n([\s\S]*?)```")
+    match = tagged.search(text) or bare.search(text)
+    code = match.group(1) if match else text
+    return code.strip() + "\n"
 
 
 def extract_python(text: str) -> str:
-    match = _FENCE.search(text)
-    code = match.group(1) if match else text
-    return code.strip() + "\n"
+    return extract_code(text, "python")
