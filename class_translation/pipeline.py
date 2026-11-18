@@ -3,7 +3,7 @@ from __future__ import annotations
 from class_translation.correction import correct
 from class_translation.providers import ChatClient
 from class_translation.smell_graph import reduce_smells
-from class_translation.smells import count_smells
+from class_translation.smells import count_target_smells
 from class_translation.state import ClassTask, TaskRecord, ensure_java_to_python
 from class_translation.testing import run_target_tests
 from class_translation.translate import translate_class
@@ -12,9 +12,13 @@ from class_translation.translate import translate_class
 def run_task(task: ClassTask, client: ChatClient) -> TaskRecord:
     ensure_java_to_python(task)
     translated = translate_class(task, client)
-    smells_after_translation = count_smells(translated, task.module_name).count
+    smells_after_translation = count_target_smells(
+        translated, task.module_name, task.target_lang
+    ).count
     corrected = correct(task, translated, client)
-    smells_after_correction = count_smells(corrected.code, task.module_name).count
+    smells_after_correction = count_target_smells(
+        corrected.code, task.module_name, task.target_lang
+    ).count
     if corrected.status == "passed":
         reduced = reduce_smells(task, corrected.code, client)
         final_code = reduced.code
@@ -22,7 +26,9 @@ def run_task(task: ClassTask, client: ChatClient) -> TaskRecord:
     else:
         final_code = corrected.code
         smell_iterations = 0
-    smells_after_smell_graph = count_smells(final_code, task.module_name).count
+    smells_after_smell_graph = count_target_smells(
+        final_code, task.module_name, task.target_lang
+    ).count
     report = run_target_tests(
         final_code, task.oracle_tests, task.module_name, task.target_lang
     )

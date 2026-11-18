@@ -8,7 +8,7 @@ from langgraph.graph import END, START, StateGraph
 from class_translation.extract import extract_code
 from class_translation.prompts import smell_messages
 from class_translation.providers import ChatClient
-from class_translation.smells import count_smells
+from class_translation.smells import count_target_smells
 from class_translation.state import MAX_SMELL_ITERATIONS, ClassTask
 from class_translation.testing import run_target_tests
 
@@ -35,7 +35,9 @@ class SmellResult:
 
 def build_smell_graph(client: ChatClient, task: ClassTask):
     def lint(state: SmellState) -> dict[str, object]:
-        report = count_smells(state["code"], state["module_name"])
+        report = count_target_smells(
+            state["code"], state["module_name"], task.target_lang
+        )
         update: dict[str, object] = {
             "smell_count": report.count,
             "smell_feedback": report.feedback,
@@ -60,7 +62,9 @@ def build_smell_graph(client: ChatClient, task: ClassTask):
             state["module_name"],
             task.target_lang,
         )
-        smells = count_smells(state["code"], state["module_name"])
+        smells = count_target_smells(
+            state["code"], state["module_name"], task.target_lang
+        )
         accepted = tests.ok and smells.count < state["previous_smell_count"]
         if accepted:
             return {
