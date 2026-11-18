@@ -17,6 +17,9 @@ def test_load_counter_fixture():
 
 
 def test_reverse_direction_is_representable_and_refused():
-    task = ClassTask("x", "python", "java", "box", "class Box {}", "tests", "oracle")
+    accepted = ClassTask("x", "python", "java", "box", "class Box {}", "tests", "oracle")
+    ensure_java_to_python(accepted)
+
+    unknown = ClassTask("x", "rust", "go", "box", "fn main() {}", "tests", "oracle")
     with pytest.raises(NotImplementedError):
-        ensure_java_to_python(task)
+        ensure_java_to_python(unknown)

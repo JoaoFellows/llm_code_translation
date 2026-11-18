@@ -48,8 +48,11 @@ def load_task(fixture_dir: Path) -> ClassTask:
     )
 
 
+_SUPPORTED_DIRECTIONS = {("java", "python"), ("python", "java")}
+
+
 def ensure_java_to_python(task: ClassTask) -> None:
-    if (task.source_lang, task.target_lang) == ("java", "python"):
+    if (task.source_lang, task.target_lang) in _SUPPORTED_DIRECTIONS:
         return
     raise NotImplementedError(
         f"Translation direction {task.source_lang} -> {task.target_lang} is not implemented"
