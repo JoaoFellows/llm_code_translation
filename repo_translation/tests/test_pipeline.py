@@ -99,3 +99,13 @@ def test_rejects_zero_tests_executed_false_positive(tmp_path, monkeypatch):
     result = run_benchmark_tests(tmp_path, workdir, "benchmark-image")
     assert not result.passed
     assert "executed 0 tests" in result.output
+
+    class CompletedSkipped:
+        returncode = 0
+        stdout = "[INFO] Not compiling test sources\n[INFO] Tests are skipped.\n[INFO] BUILD SUCCESS\n"
+        stderr = ""
+
+    monkeypatch.setattr("repo_translation.evaluation.subprocess.run", lambda args, **kwargs: CompletedSkipped())
+    result_skip = run_benchmark_tests(tmp_path, workdir, "benchmark-image")
+    assert not result_skip.passed
+    assert "executed 0 tests" in result_skip.output

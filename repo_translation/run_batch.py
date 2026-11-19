@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -24,6 +25,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate a batch of RepoTransBench repositories")
     parser.add_argument("--dataset-root", type=Path, required=True)
     parser.add_argument("--provider", choices=sorted(PRESETS), default="openai")
+    parser.add_argument("--model", help="Override the default model for the chosen provider")
+    parser.add_argument("--base-url", help="Override the OpenAI-compatible base URL for the chosen provider")
     parser.add_argument("--docker-image", required=True)
     parser.add_argument("--source", help="Filter source language")
     parser.add_argument("--target", help="Filter target language")
@@ -64,8 +67,12 @@ def main(argv: list[str] | None = None) -> int:
         raise RuntimeError(f"Docker image unavailable: {args.docker_image}\n{image.stderr[-1000:]}")
     if any(p.target_language == "Java" for p in selected) and pmd_executable() is None:
         print("[AVISO] PMD 7.1.0 não encontrado no host. A contagem de smells será desativada para alvos Java.", flush=True)
-    client = build_client(args.provider)
-    output = root / "translated_projects" / args.provider
+    client = build_client(args.provider, model=args.model, base_url=args.base_url)
+    run_label = args.provider
+    if args.model:
+        model_slug = re.sub(r"[^A-Za-z0-9_.-]", "_", args.model)
+        run_label = f"{args.provider}__{model_slug}"
+    output = root / "translated_projects" / run_label
     failures = 0
     for index, project in enumerate(selected, 1):
         destination = output / project.source_language / project.target_language / project.name

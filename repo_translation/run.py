@@ -21,6 +21,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source", required=True, help="Source language label, for example Java")
     parser.add_argument("--target", required=True, help="Target language label, for example Python")
     parser.add_argument("--provider", choices=sorted(PRESETS), default="openai")
+    parser.add_argument("--model", help="Override the default model for the chosen provider")
+    parser.add_argument("--base-url", help="Override the OpenAI-compatible base URL for the chosen provider")
     parser.add_argument("--docker-image", required=True, help="Image with benchmark test dependencies")
     parser.add_argument("--output-root", type=Path, help="Must be inside dataset-root; default translated_projects/<provider>")
     parser.add_argument("--max-corrections", type=int, default=3)
@@ -30,6 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     root = args.dataset_root.resolve()
     project = select_project(load_projects(root), args.project, args.source, args.target)
     provider_name = re.sub(r"[^A-Za-z0-9_.-]", "_", args.provider)
+    if args.model:
+        provider_name = f"{provider_name}__{re.sub(r'[^A-Za-z0-9_.-]', '_', args.model)}"
     output = (args.output_root or root / "translated_projects" / provider_name).resolve()
     output.relative_to(root)
     if output == root or output.is_relative_to(root / "source_projects") or output.is_relative_to(root / "target_projects"):
@@ -40,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         raise RuntimeError(f"Docker image unavailable: {args.docker_image}\n{image.stderr[-1000:]}")
     if args.target == "Java" and pmd_executable() is None:
         print("[AVISO] PMD 7.1.0 não encontrado no host. A contagem de smells será desativada para alvos Java.", file=sys.stderr)
-    client = build_client(args.provider)
+    client = build_client(args.provider, model=args.model, base_url=args.base_url)
     record = run_project(project, root, output, client, args.docker_image,
                          args.max_corrections, args.max_smell_iterations)
     result_path = Path(record.workdir).parent / f"{project.name}.result.json"

@@ -4,8 +4,10 @@ from class_translation.providers import PRESETS, ScriptedChatClient, build_clien
 
 
 def test_presets_read_key_from_env():
-    assert set(PRESETS) == {"openai", "openrouter", "deepseek", "gemini", "ollama"}
+    assert set(PRESETS) == {"openai", "openrouter", "deepseek", "gemini", "groq", "nextforce", "ollama"}
     assert PRESETS["deepseek"]["api_key_env"] == "DEEPSEEK_API_KEY"
+    assert PRESETS["groq"]["api_key_env"] == "GROQ_API_KEY"
+    assert PRESETS["nextforce"]["api_key_env"] == "NEXTFORCE_API_KEY"
     assert PRESETS["openai"]["base_url"].startswith("https://")
 
 

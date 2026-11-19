@@ -55,6 +55,16 @@ PRESETS: dict[str, dict[str, str]] = {
         "model": "gemini-3.5-flash-lite",
         "api_key_env": "GEMINI_API_KEY",
     },
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "model": "openai/gpt-oss-120b",
+        "api_key_env": "GROQ_API_KEY",
+    },
+    "nextforce": {
+        "base_url": "https://router.nexforce.ai/v1",
+        "model": "openai/gpt-4.1-mini",
+        "api_key_env": "NEXTFORCE_API_KEY",
+    },
     "ollama": {
         "base_url": "http://127.0.0.1:11434/v1",
         "model": "qwen2.5-coder",
@@ -125,19 +135,30 @@ class ScriptedChatClient:
         return self._responses.pop(0)
 
 
-def build_client(preset: str, timeout: float | None = None) -> ChatClient:
+def build_client(
+    preset: str,
+    timeout: float | None = None,
+    *,
+    model: str | None = None,
+    base_url: str | None = None,
+) -> ChatClient:
     if preset not in PRESETS:
         raise KeyError(preset)
     config = PRESETS[preset]
+    prefix = preset.upper()
     api_key = os.environ.get(config["api_key_env"], "")
     if not api_key:
         if preset == "ollama":
             api_key = "ollama"
         else:
             raise RuntimeError(f"Missing environment variable {config['api_key_env']}")
+    resolved_base_url = base_url or os.environ.get(f"{prefix}_BASE_URL", "") or config["base_url"]
+    if not resolved_base_url:
+        raise RuntimeError(f"Missing base URL for provider '{preset}'. Set {prefix}_BASE_URL in .env or pass --base-url.")
+    resolved_model = model or os.environ.get(f"{prefix}_MODEL", "") or config["model"]
     return OpenAICompatibleClient(
-        base_url=config["base_url"],
+        base_url=resolved_base_url,
         api_key=api_key,
-        model=config["model"],
+        model=resolved_model,
         timeout=timeout,
     )

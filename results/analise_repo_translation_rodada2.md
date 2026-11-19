@@ -96,9 +96,63 @@ Os projetos afetados pelas correções (os 4 que haviam encerrado como `error` +
 
 ---
 
-## 5. Conclusões
+## 5. Por Que Repositórios Reprovam Mesmo com Alta Assertividade nos Testes Unitários?
+
+A aparente contradição entre uma taxa de aprovação por repositório moderada/baixa (`70%` em Java → Python e `10%` em Python → Java) e uma taxa de aprovação de testes individuais elevada (`88,5%` e `97,1%` dos executados) é explicada por **três fatores**:
+
+1. **Critério binário ("tudo ou nada") no nível de repositório:**
+   - Um repositório só recebe `PASSED` se **100% dos testes** passarem (`exit code 0`). Basta **1 único teste falhar** para o projeto inteiro contar como `FAILED` (ex.: `arthepsy_ssh-audit` acertou **27/28 = 96,4%** dos testes JUnit, mas o repositório inteiro ficou `FAILED`).
+   - Matematicamente, o rigor cresce com o tamanho da suíte: se cada teste individual tivesse 95% de probabilidade independente de passar, a chance de um repositório com 30 testes aprovar todos simultaneamente cairia para $0{,}95^{30} \approx 21\%$.
+2. **Acerto da lógica central vs. falhas em casos de borda:**
+   - Nos projetos que compilam e executam, o modelo traduz bem a estrutura e o caminho principal, mas falha em contratos pontuais ou *edge cases* — como retorno `null` em entrada inválida (`arthepsy_ssh-audit`, 27/28), mensagem/tipo exato de exceção (`aventrix_jnanoid`, 19/23) ou limite exato `minLength == maxLength` (`agarciadom_xeger`, 31/40).
+   - Como o RepoTransBench executa `public_tests` e `tests/original` em conjunto (muitas vezes espelhados), um único defeito de borda costuma derrubar pares de testes, deixando o restante da suíte verde.
+3. **Efeito de seleção no denominador (crítico em Python → Java):**
+   - Em Java, projetos que falham em `testCompile` (6 projetos) ou em erro de geração abortam **antes de invocar o JUnit**, registrando `0/0` testes executados e ficando fora do denominador dos testes unitários.
+   - Assim, os `34/35 (97,1%)` em Python → Java refletem apenas os **2 projetos que compilaram** (`djui_alias-tips`: `7/7` e `arthepsy_ssh-audit`: `27/28`). Em Java → Python, por outro lado, todos os 10 projetos executaram o `pytest`, tornando `216/244 (88,5%)` representativo da amostra inteira.
+
+Para evitar distorções de interpretação, vale reportar também a **média da taxa de testes aprovados por repositório atribuindo `0%` a projetos que não compilaram/executaram**:
+
+| Par | Aprovação de Repositórios (tudo ou nada) | Testes Executados Aprovados | Média de Testes Aprovados por Projeto (incluindo `0%`) |
+| --- | :---: | :---: | :---: |
+| **Java → Python** | **70,0%** (7/10) | **88,5%** (216/244) | **92,5%** |
+| **Python → Java** | **10,0%** (1/10) | **97,1%** (34/35 executados) | **19,6%** |
+
+---
+
+## 6. Causas do Baixo Desempenho em Python → Java
+
+A assimetria severa de **Python → Java (`10%`)** frente a **Java → Python (`70%`)** decorre de uma combinação de **quatro causas observadas diretamente nos logs**:
+
+1. **Causa principal (5/10 projetos = 50%): inferência de contrato estático "às cegas" (`testCompile`):**
+   - Em Python, tipos de parâmetros, retornos e atributos são dinâmicos (`def fn(x)`, `*args/**kwargs`, *monkeypatching*). Ao traduzir para Java **sem ver os testes JUnit**, há múltiplas APIs Java válidas e compiláveis para o mesmo código Python, mas o `javac` rejeita qualquer divergência de tipo frente ao contrato escolhido pelos testes do benchmark:
+     - `List<String>` vs. `String[]` (`initstring_linkedin2username`, `assertArrayEquals`);
+     - `LocalDateTime` vs. `int` (`Shpota_github-activity-generator`);
+     - Inferência de generics em `DataLoader<K, V>` (`syrusakbary_aiodataloader`);
+     - `List<T>` vs. `String` (`rveachkc_pymsteams`);
+     - Mock dinâmico de atributos (`DummyCompletion` vs. `Class<?>`, em `stjordanis_betterprompt`).
+   - **Evidência-chave:** em **todos os 5 casos**, o código principal traduzido (`src/main/java`) **compilou sem erros** (`mvn compile` bem-sucedido). A falha ocorreu exclusivamente no casamento de assinaturas da fase `testCompile`. Em Java → Python ocorre o inverso: Java já fornece todas as assinaturas estáticas e o *duck typing* do Python absorve pequenas variações de tipo.
+2. **Orçamento curto de correções diante de erros em cascata do `javac`:**
+   - Como os testes ficam ocultos na tradução inicial (para evitar *data leakage*), o modelo só descobre os tipos exatos exigidos via feedback de compilação.
+   - Erros do `javac` costumam surgir em cascata; com `--max-corrections 3`, projetos como `Shpota_github-activity-generator` encerraram o ciclo restando apenas **1 erro de tipo** para compilar os testes.
+3. **Ruído e projetos inviáveis no próprio benchmark (3/10 projetos = 30%):**
+   - Três dos 10 menores projetos Python → Java não eram passíveis de aprovação neste ambiente, independentemente do LLM:
+     - `angeloc_s3-pit-restore`: erro de compilação dentro do próprio teste do benchmark (`FileWriter` sem `import` em `src/test/...`);
+     - `jmespath_jp`: suíte pula todos os testes via `Assumptions.assumeTrue("./jp")` pela ausência do binário CLI externo `./jp`;
+     - `tiangolo_meinheld-gunicorn-flask-docker`: repositório de configuração Docker/Python sem classes de lógica para tradução em Java.
+   - Excluindo esses 3 casos inviáveis, a amostra efetiva cai para **7 projetos traduzíveis** (nos quais 2 compilaram e acertaram `34/35` testes, e 5 pararam apenas em assinatura `testCompile`).
+4. **Fator secundário — porte do modelo (`gemini-3.5-flash-lite`):**
+   - Modelos compactos apresentam excelente desempenho em Python, mas têm maior dificuldade em reconciliar sistemas de tipos mais rígidos do Java (generics, sobrecargas e *wildcards*) em poucas iterações.
+
+### Experimentos Recomendados para Isolar e Mitigar o Gargalo em Python → Java
+1. **Aumentar `--max-corrections` de `3` para `6`** para verificar quantos projetos presos a 1–2 erros de `testCompile` convergem.
+2. **Fornecer `public_tests` como especificação de interface** (mantendo `original_tests` privados para avaliação), alinhando o protocolo a cenários reais de migração orientada por contrato.
+3. **Comparar com um modelo de maior capacidade** (ex.: `gemini-2.5-pro` / `gpt-4.1`) nos mesmos 7 projetos viáveis para separar limitação de modelo vs. ambiguidade intrínseca de tipagem.
+
+---
+
+## 7. Conclusões
 
 1. **Zero erros de JSON em 20 repositórios:** O JSON Mode nativo eliminou **100% dos `JSONDecodeError`** (de `3/20` para `0/20`), desbloqueando traduções grandes de até ~30 KB (`arthepsy_ssh-audit` e `c0ny1_chunked-coding-converter`).
 2. **Avaliação metodologicamente limpa:** A checagem de `Tests run: 0` eliminou o falso-positivo de `jmespath_jp`, garantindo que todo projeto marcado como `passed` tenha efetivamente executado e aprovado testes reais.
-3. **Desempenho sólido em Java → Python (70% de repositórios aprovados; 88,5% dos testes unitários; -70,5% de smells):** O pipeline de tradução + correção + refatoração de smells com Pylint funciona de forma altamente consistente nesse sentido.
-4. **Principal barreira remanescente em Python → Java (5/10 falhas em `testCompile`):** Como o código Python não declara tipos estáticos, o modelo traduz corretamente a lógica (compilando `src/main/java` em todos os casos), mas diverge das assinaturas exatas exigidas pelos testes JUnit (arrays vs listas, generics, tipos de data). Fornecer assinaturas públicas esperadas ou aumentar o orçamento de iterações de correção para alvos estaticamente tipados é o próximo vetor mais promissor de ganho.
+3. **Desempenho sólido em Java → Python (70% de repositórios aprovados; 88,5% dos testes unitários; média de 92,5% por projeto; -70,5% de smells):** O pipeline de tradução + correção + refatoração de smells com Pylint funciona de forma altamente consistente nesse sentido.
+4. **Principal barreira remanescente em Python → Java (`testCompile` + ruído do benchmark):** Descontando os 3 projetos inviáveis do dataset, 5 dos 7 projetos viáveis compilaram `src/main/java` mas travaram em incompatibilidade de tipos/assinaturas no `testCompile`, enquanto os 2 que compilaram os testes acertaram `34/35 (97,1%)` casos individuais. Fornecer contratos públicos ou ampliar as iterações de reparo é o próximo passo mais promissor.

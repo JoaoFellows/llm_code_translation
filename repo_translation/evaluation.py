@@ -44,6 +44,8 @@ _MAVEN_TESTS = re.compile(r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s
 
 def _zero_tests_executed(output: str) -> bool:
     clean = _ANSI.sub("", output)
+    if re.search(r"\b(?:Tests are skipped\.|Not compiling test sources)\b", clean, re.IGNORECASE):
+        return True
     maven_matches = _MAVEN_TESTS.findall(clean)
     if maven_matches:
         last_run = int(maven_matches[-1][0])
