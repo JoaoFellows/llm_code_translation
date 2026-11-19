@@ -157,17 +157,27 @@ def compile_code(pl):
         return 0, ""
 
 
+def values_match(left, right):
+    if isinstance(left, bool) or isinstance(right, bool):
+        return left == right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return math.isclose(float(left), float(right), rel_tol=1e-5, abs_tol=1e-5)
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(values_match(item, other) for item, other in zip(left, right))
+    return left == right
+
+
 def compare_output(true_output, to_be_checked):
     if to_be_checked.strip() == true_output.strip():
         return True
-    else:
-        try:
-            true_output = float(true_output)
-            to_be_checked = float(to_be_checked)
-            return math.isclose(true_output, to_be_checked, rel_tol=1e-5)
-        except ValueError:
-            return False
-    return False
+    try:
+        return values_match(json.loads(true_output), json.loads(to_be_checked))
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+    try:
+        return math.isclose(float(true_output), float(to_be_checked), rel_tol=1e-5, abs_tol=1e-5)
+    except (TypeError, ValueError):
+        return False
 
 
 def cleanup(pl):

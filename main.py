@@ -40,7 +40,7 @@ def pipeline(data, tcos, code_smells):
         c.start()
     data = dict(data)
 
-    llm_code = {}.fromkeys(data.keys(), {})
+    llm_code = {key: {} for key in data.keys()}
 
     # Run code translation for all LLMs specified in conf
 
@@ -116,8 +116,11 @@ def main():
 
     n_procs = len(chunks)
     print(f'Spawning {n_procs} processes from {os.getpid()}')
-    with Pool(n_procs) as p:
-        p.starmap(pipeline, zip(chunks, tco_chunks, cs_chunks))
+    if n_procs <= 1:
+        pipeline(chunks[0], tco_chunks[0], cs_chunks[0])
+    else:
+        with Pool(n_procs) as p:
+            p.starmap(pipeline, zip(chunks, tco_chunks, cs_chunks))
 
     # combine test case outcomes of each process to one single dataframe
     if config['steps']['run_tests'] or config['steps']['run_prompt_crafting']:

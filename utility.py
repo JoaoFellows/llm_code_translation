@@ -58,9 +58,14 @@ def translation_codesample_factory(submission_id: str, code: str, dataset: str, 
     return cheap_codesample_factory(submission_id, file_path, dataset, task_id, prompt_id)
 
 
+def model_directory_name(llm_model: str) -> str:
+    return llm_model.replace(":", "_")
+
+
 def get_code_sample_path(submission_id: str, dataset: str, programming_language: str, task_id: str, llm_model: str,
                          number: int, prompt_id: str, iteration: int = 0):
-    base_path = os.path.join(config["base_path_data"], dataset, "translations", task_id, llm_model, str(iteration))
+    base_path = os.path.join(config["base_path_data"], dataset, "translations", task_id,
+                             model_directory_name(llm_model), str(iteration))
     os.makedirs(base_path, exist_ok=True)
     return os.path.join(base_path, f"{str(number)}__{prompt_id}__{submission_id}{get_suffix(programming_language)}")
 
@@ -203,7 +208,7 @@ def get_tco_row_from_data(dataset, problem_id, path, tc_id, outcome, error, stac
         return pd.Series({'Dataset': dataset, 'Problem ID': problem_id, 'Path': path,
                           'Testcase_id': tc_id, 'Outcome': outcome, 'Error': error, 'Stacktrace': stacktrace})
     else:  # we have a llm generated code sample with possible iteration and n_translation values associated
-        path_split = path.split(llm)[1]
+        path_split = path.split(model_directory_name(llm))[1]
         path_split = path_split.split(os.path.sep)
         it = int(path_split[1])
         n_translation = int(path_split[2].split('_')[0])

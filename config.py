@@ -5,7 +5,21 @@ config = {
                  'evoeval': {'random_sample_size_per_pl_max_translation': 200, 'random_sample_size_per_pl_max_prompt_choosing': 10},
                  'avatar': {'random_sample_size_per_pl_max_translation': 200, 'random_sample_size_per_pl_max_prompt_choosing': 10},
                  'codenet': {'random_sample_size_per_pl_max_translation': 200, 'random_sample_size_per_pl_max_prompt_choosing': 10}},
-    'LLMs': {'deepseek-ai/deepseek-coder-33b-instruct': {'max_attempts': 3}, 'mistralai/Mixtral-8x7B-Instruct-v0.1': {'max_attempts': 3}, 'ibm-granite/granite-34b-code-instruct': {'max_attempts': 3}, 'ise-uiuc/Magicoder-S-DS-6.7B': {'max_attempts': 3}, 'meta-llama/CodeLlama-70b-Instruct-hf': {'max_attempts': 3}, 'meta-llama/Meta-Llama-3-8B-Instruct': {'max_attempts': 3}, 'meta-llama/Meta-Llama-3-70B-Instruct': {'max_attempts': 3}, 'mistralai/Codestral-22B-v0.1': {'max_attempts': 3}},
+    'LLMs': {
+        'deepseek-ai/deepseek-coder-33b-instruct': {'max_attempts': 3},
+        'mistralai/Mixtral-8x7B-Instruct-v0.1': {'max_attempts': 3},
+        'ibm-granite/granite-34b-code-instruct': {'max_attempts': 3},
+        'ise-uiuc/Magicoder-S-DS-6.7B': {'max_attempts': 3},
+        'meta-llama/CodeLlama-70b-Instruct-hf': {'max_attempts': 3},
+        'meta-llama/Meta-Llama-3-8B-Instruct': {'max_attempts': 3},
+        'meta-llama/Meta-Llama-3-70B-Instruct': {'max_attempts': 3},
+        'mistralai/Codestral-22B-v0.1': {'max_attempts': 3},
+        'api:openai': {'max_attempts': 3, 'provider': 'openai'},
+        'api:openrouter': {'max_attempts': 3, 'provider': 'openrouter'},
+        'api:deepseek': {'max_attempts': 3, 'provider': 'deepseek'},
+        'api:gemini': {'max_attempts': 3, 'provider': 'gemini'},
+        'api:ollama': {'max_attempts': 3, 'provider': 'ollama'},
+    },
     'steps': {
         'prepare_datasets': ['codenet', 'avatar', 'evalplus', 'evoeval'],  # datasets to be loaded; should at least contain one entry
         'only_specific_tasks': False,
@@ -26,11 +40,12 @@ config = {
         'run_backtranslation': False,
         'run_manual_analysis': False
     },
-    'programming_languages': [constants.java, constants.python, constants.scala, constants.rust],
-    'number_of_translations_per_task': 3,
+    'programming_languages': [constants.java, constants.python],
+    'number_of_translations_per_task': 1,
     'prompt_crafting_iterations': 3,
     'prompt_crafting_current_iteration': 0,  # increment for each prompt crafting iteration
     'manual_analysis_source': False,
+    'api_prompt_id': 'p1',
     'prompt_selection_config': 'prompt_selection_prompts.json',
     'prompt_selection_assignment': 'prompt_selection_assignment.json',
     'time_logging_file': 'time_log.csv',

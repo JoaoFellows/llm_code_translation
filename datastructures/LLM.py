@@ -8,9 +8,7 @@ import tiktoken
 from openai import OpenAI
 
 import constants
-from transformers import AutoTokenizer
 import re
-import vllm
 
 from config import config
 from datastructures.Codesample import Codesample
@@ -203,6 +201,9 @@ class HFLLM(LLM):
     def __init__(self, model: str):
         self.model = model
         if not self.model in hf_models:
+            import vllm
+            from transformers import AutoTokenizer
+
             tokenizer = AutoTokenizer.from_pretrained(self.model)
             tokenizer.pad_token = tokenizer.eos_token
             tokenizers[self.model] = tokenizer

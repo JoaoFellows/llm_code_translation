@@ -7,6 +7,7 @@ import pandas as pd
 import constants
 import utility
 from datastructures.LLM import GPTOpenAI, HFLLM
+from llm_api import ApiLLM, is_api_model
 import datastructures.LLM
 from datastructures.Codesample import Codesample, get_language_by_suffix, get_target_language
 from config import config
@@ -18,12 +19,13 @@ logger = logging.getLogger("my_project_logger")
 
 def run_translations(data, llm_code, prompt_selection=False, llm_models=config["steps"]["run_translation"]):
     for llm_model in llm_models:
-        if "openai_" in llm_model:
+        if is_api_model(llm_model):
+            llm = ApiLLM(llm_model)
+        elif "openai_" in llm_model:
             llm = GPTOpenAI(llm_model)
-            translate_all_samples_for_llm(llm, data, llm_code, prompt_selection)
         else:
             llm = HFLLM(llm_model)
-            translate_all_samples_for_llm(llm, data, llm_code, prompt_selection)
+        translate_all_samples_for_llm(llm, data, llm_code, prompt_selection)
     return llm_code
 
 
@@ -93,7 +95,18 @@ def translate_one_sample_for_llm(dataset: str, task_id: str, llm: datastructures
             utility.get_code_sample_path(code_sample.submission_id, dataset, target_lang, task_id, llm.model, it_number,
                                          "default", prompt_crafting_iteration)) for it_number in
             range(config["number_of_translations_per_task"])]
+        if not all(do_translations_exist) and os.environ.get("TRANSLATION_ONLY_EXISTING") == "1":
+            return
         if all(do_translations_exist):
+            translated_code_samples = [
+                utility.cheap_codesample_factory(
+                    code_sample.submission_id,
+                    utility.get_code_sample_path(code_sample.submission_id, dataset, target_lang, task_id, llm.model,
+                                                 it_number, "default", prompt_crafting_iteration),
+                    dataset, task_id, "default")
+                for it_number in range(config["number_of_translations_per_task"])
+            ]
+            _store_translations(dataset, task_id, llm.model, prompt_crafting_iteration, translated_code_samples, llm_code)
             return
 
     codes = llm.translate(code_sample, target_lang, dataset, task_id, num_iterations,
@@ -119,15 +132,19 @@ def translate_one_sample_for_llm(dataset: str, task_id: str, llm: datastructures
                                                                     prompt_crafting_iteration)
             translated_code_samples.append(translated_code_sample)
 
+    _store_translations(dataset, task_id, llm.model, prompt_crafting_iteration, translated_code_samples, llm_code)
+
+
+def _store_translations(dataset, task_id, model, prompt_crafting_iteration, translated_code_samples, llm_code):
     for tcs in translated_code_samples:
         if (dataset, task_id) not in llm_code.keys():
             llm_code[(dataset, task_id)] = {}
-        if llm.model not in llm_code[(dataset, task_id)].keys():
-            llm_code[(dataset, task_id)] = {llm.model: {}}
-        if prompt_crafting_iteration not in llm_code[(dataset, task_id)][llm.model]:
-            llm_code[(dataset, task_id)][llm.model][prompt_crafting_iteration] = []
+        if model not in llm_code[(dataset, task_id)].keys():
+            llm_code[(dataset, task_id)][model] = {}
+        if prompt_crafting_iteration not in llm_code[(dataset, task_id)][model]:
+            llm_code[(dataset, task_id)][model][prompt_crafting_iteration] = []
 
-        llm_code[(dataset, task_id)][llm.model][prompt_crafting_iteration].append(tcs)
+        llm_code[(dataset, task_id)][model][prompt_crafting_iteration].append(tcs)
 
 
 def load_from_disk(data, tcos, code_smells):
@@ -147,7 +164,8 @@ def load_from_disk(data, tcos, code_smells):
 
     for (dataset, task_id), _ in data.items():
         for llm_model in config["steps"]["read_translations_from_disk"]:
-            base_path = os.path.join(config["base_path_data"], dataset, "translations", task_id, llm_model)
+            base_path = os.path.join(config["base_path_data"], dataset, "translations", task_id,
+                                     utility.model_directory_name(llm_model))
             try:
                 iterations = os.listdir(base_path)
                 for it in iterations:
@@ -255,8 +273,8 @@ def load_from_disk_prompt_crafting(data: dict, tcos: pd.DataFrame, code_smells: 
                 llm_code[(dataset, task_id)] = {}
 
             for llm_model in config["steps"]["read_translations_from_disk"]:
-                path = os.path.join(config["base_path_data"], dataset, "translations", task_id, llm_model,
-                                    str(iteration))
+                path = os.path.join(config["base_path_data"], dataset, "translations", task_id,
+                                    utility.model_directory_name(llm_model), str(iteration))
                 files = os.listdir(path)
 
                 if llm_model not in llm_code[(dataset, task_id)].keys():

@@ -281,7 +281,18 @@ class JSample(Codesample):
         if len(self.testcase_outcomes) != 0:
             return
 
-        self.evaluate_tcs_docker(constants.java, tcs)
+        original_path = self.path
+        if self.dataset == "evalplus":
+            from evalplus_driver import materialize_java_main
+            try:
+                self.path = materialize_java_main(self.path, self.task_id, config["base_path_data"])
+            except (ValueError, OSError) as exc:
+                logger.warning(f"Could not build an EvalPlus driver for {self.task_id}: {exc}")
+                self.path = original_path
+        try:
+            self.evaluate_tcs_docker(constants.java, tcs)
+        finally:
+            self.path = original_path
 
     def run_code_smell_detection(self):
         if not self.code_smell_result == "":
