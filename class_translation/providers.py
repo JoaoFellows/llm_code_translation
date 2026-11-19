@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Protocol
 
+import openai
 from openai import OpenAI
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -69,14 +71,46 @@ class OpenAICompatibleClient:
             client_kwargs["timeout"] = timeout
         self._client = OpenAI(**client_kwargs)
 
-    def complete(self, messages: list[dict[str, str]]) -> str:
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            temperature=0,
-        )
-        content = response.choices[0].message.content
-        return content or ""
+    def complete(self, messages: list[dict[str, str]], *, json_mode: bool = False) -> str:
+        max_retries = 8
+        delay = 5.0
+        use_json_mode = json_mode
+        for attempt in range(max_retries):
+            try:
+                kwargs: dict[str, object] = {
+                    "model": self._model,
+                    "messages": messages,
+                    "temperature": 0,
+                }
+                if use_json_mode:
+                    kwargs["response_format"] = {"type": "json_object"}
+                response = self._client.chat.completions.create(**kwargs)
+                content = response.choices[0].message.content
+                if content and content.strip():
+                    return content
+                if attempt == max_retries - 1:
+                    return content or ""
+                wait = min(delay * (2 ** attempt), 15.0)
+                print(f"[EmptyResponse] Empty content – waiting {wait:.0f}s before retry {attempt + 1}/{max_retries - 1}…", flush=True)
+                time.sleep(wait)
+            except openai.BadRequestError:
+                if use_json_mode:
+                    use_json_mode = False
+                    continue
+                raise
+            except openai.RateLimitError as exc:
+                if attempt == max_retries - 1:
+                    raise
+                wait = delay * (2 ** attempt)
+                print(f"[RateLimit] 429 – waiting {wait:.0f}s before retry {attempt + 1}/{max_retries - 1}…", flush=True)
+                time.sleep(wait)
+            except (openai.APITimeoutError, openai.APIConnectionError) as exc:
+                if attempt == max_retries - 1:
+                    raise
+                wait = delay * (2 ** attempt)
+                print(f"[Timeout/Connection] {exc} – waiting {wait:.0f}s before retry…", flush=True)
+                time.sleep(wait)
+        return ""  # unreachable
 
 
 class ScriptedChatClient:

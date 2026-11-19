@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from class_translation.smells import count_target_smells
+from class_translation.smells import count_target_smells, pmd_executable
 
 
 EXTENSIONS = {
@@ -37,6 +38,22 @@ class TestResult:
     output: str
 
 
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+_MAVEN_TESTS = re.compile(r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+),\s*Skipped:\s*(\d+)")
+
+
+def _zero_tests_executed(output: str) -> bool:
+    clean = _ANSI.sub("", output)
+    maven_matches = _MAVEN_TESTS.findall(clean)
+    if maven_matches:
+        last_run = int(maven_matches[-1][0])
+        if last_run == 0:
+            return True
+    if re.search(r"\b(?:no tests ran|collected 0 items)\b", clean, re.IGNORECASE) and not re.search(r"\b[1-9]\d*\s+passed\b", clean):
+        return True
+    return False
+
+
 def run_benchmark_tests(dataset_root: Path, workdir: Path, image: str, timeout: int = 600) -> TestResult:
     root = dataset_root.resolve()
     relative = workdir.resolve().relative_to(root)
@@ -45,7 +62,7 @@ def run_benchmark_tests(dataset_root: Path, workdir: Path, image: str, timeout: 
     container_dir = "/workspace/" + relative.as_posix()
     try:
         completed = subprocess.run(
-            ["docker", "run", "--rm", "--network", "none", "--mount",
+            ["docker", "run", "--rm", "--network", "none", "-e", "PYTHONPATH=.", "--mount",
              f"type=bind,source={root},target=/workspace", "--workdir", container_dir,
              image, "bash", "run_tests.sh"],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -54,7 +71,11 @@ def run_benchmark_tests(dataset_root: Path, workdir: Path, image: str, timeout: 
     except subprocess.TimeoutExpired as error:
         return TestResult(False, None, f"Test timeout after {timeout}s: {error}")
     output = (completed.stdout + "\n" + completed.stderr)[-12000:]
-    return TestResult(completed.returncode == 0, completed.returncode, output)
+    passed = completed.returncode == 0
+    if passed and _zero_tests_executed(output):
+        passed = False
+        output = (output + "\n[EVAL] Marked as failed: test runner exited 0 but executed 0 tests.")[-12000:]
+    return TestResult(passed, completed.returncode, output)
 
 
 @dataclass(frozen=True)
@@ -90,6 +111,8 @@ def count_repository_smells(workdir: Path, target_language: str) -> SmellResult 
         lines = [f"{item.get('path', '')}: {item.get('symbol', '')}: {item.get('message', '')}"
                  for item in messages if isinstance(item, dict)]
         return SmellResult(len(lines), "\n".join(lines)[:12000])
+    if target_language == "Java" and pmd_executable() is None:
+        return None
     total = 0
     feedback = []
     for path in paths:

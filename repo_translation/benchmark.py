@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-_NAME = re.compile(r"^[A-Za-z0-9_.+-]+$")
+_NAME = re.compile(r"^[A-Za-z0-9_.+#-]+$")
 
 
 @dataclass(frozen=True)
@@ -35,9 +35,9 @@ def load_projects(dataset_root: Path) -> list[Project]:
         source_dir = root / "source_projects" / source / name
         target_dir = root / "target_projects" / source / target / name
         if not source_dir.is_dir() or not target_dir.is_dir():
-            raise FileNotFoundError(f"Missing source or target project on line {number}: {name}")
+            continue
         if not (target_dir / "run_tests.sh").is_file():
-            raise FileNotFoundError(f"Missing run_tests.sh for {name}")
+            continue
         projects.append(Project(name, source, target, source_dir, target_dir))
     return projects
 

@@ -1,0 +1,21 @@
+pair,project_name,status,pass_at_1,correction_iterations,smell_iterations,smells_initial,smells_after_corr,smells_final,tests_passed,tests_failed,tests_errors,tests_total,category,reason
+Java->Python,aegis1980_WifiHotSpot,passed,True,0,3,17,17,0,22,0,0,22,passed,All tests passed
+Java->Python,agarciadom_xeger,failed,False,3,0,75,71,71,31,9,0,40,python_test_assertion_failure,E       src.xeger.FailedRandomWalkException: Exceeded maximum walk length (4) before reaching an accept state: target length was 4 (min leng
+Java->Python,alexjlockwood_adp-path-morph-play-to-pause,passed,True,0,0,8,8,8,6,0,0,6,passed,All tests passed
+Java->Python,andydevacc_MentionEditText,failed,False,3,0,38,40,40,28,15,0,43,python_test_assertion_failure,E         ?  +
+Java->Python,aventrix_jnanoid,failed,False,3,0,7,13,13,19,4,0,23,python_test_assertion_failure,E           ValueError: random cannot be null.
+Java->Python,c0ny1_chunked-coding-converter,passed,True,0,2,9,9,0,40,0,0,40,passed,All tests passed
+Java->Python,chiteroman_BootloaderSpoofer,passed,True,0,0,7,7,7,8,0,0,8,passed,All tests passed
+Java->Python,code-not-found_spring-kafka,passed,True,0,1,5,5,0,20,0,0,20,passed,All tests passed
+Java->Python,corbt_react-native-keep-awake,passed,False,1,2,8,14,3,16,0,0,16,passed,All tests passed
+Java->Python,JakeWharton_picasso2-okhttp3-downloader,passed,True,0,2,7,7,0,26,0,0,26,passed,All tests passed
+Python->Java,angeloc_s3-pit-restore,failed,False,0,0,,,,0,0,0,0,java_other_failure,[ERROR] /workspace/translated_projects/gemini/Python/Java/angeloc_s3-pit-restore/src/test/java/com/angeloc/s3pitrestore/publictests/PublicS3
+Python->Java,arthepsy_ssh-audit,failed,False,3,0,,,,27,1,0,28,java_test_assertion_failure,[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project ssh-audit: There are test
+Python->Java,djui_alias-tips,passed,False,1,0,,,,7,0,0,7,passed,All tests passed
+Python->Java,initstring_linkedin2username,failed,False,3,0,,,,0,0,0,0,java_other_failure,[ERROR] /workspace/translated_projects/gemini/Python/Java/initstring_linkedin2username/src/test/java/com/initstring/public_/TestPublicLinked
+Python->Java,jmespath_jp,failed,False,1,0,,,,0,0,0,0,java_test_assertion_failure,[EVAL] Marked as failed: test runner exited 0 but executed 0 tests.
+Python->Java,rveachkc_pymsteams,failed,False,3,0,,,,0,0,0,0,java_test_compile_error,[ERROR] /workspace/translated_projects/gemini/Python/Java/rveachkc_pymsteams/src/test/java/com/example/pymsteams/publics/PublicCardSectionAn
+Python->Java,Shpota_github-activity-generator,failed,False,3,0,,,,0,0,0,0,java_test_compile_error,[ERROR] /workspace/translated_projects/gemini/Python/Java/Shpota_github-activity-generator/src/test/java/com/example/public_tests/PublicCont
+Python->Java,stjordanis_betterprompt,failed,False,3,0,,,,0,0,0,0,java_other_failure,[ERROR] /workspace/translated_projects/gemini/Python/Java/stjordanis_betterprompt/src/test/java/com/betterprompt/public_tests/PublicBetterPr
+Python->Java,syrusakbary_aiodataloader,failed,False,3,0,,,,0,0,0,0,java_test_compile_error,[ERROR] /workspace/translated_projects/gemini/Python/Java/syrusakbary_aiodataloader/src/test/java/com/example/aiodataloader/original/DataLoa
+Python->Java,tiangolo_meinheld-gunicorn-flask-docker,error,False,,,,,,0,0,0,0,no_source_generated,ValueError: No Java source files to evaluate in D:\download\dataset\translated_projects\gemini\Python\Java\tiangolo_meinheld-gunicorn-flask-

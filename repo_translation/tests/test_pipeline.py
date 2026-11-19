@@ -82,3 +82,20 @@ def test_runs_benchmark_script_in_project_container(tmp_path, monkeypatch):
     assert result.passed
     assert calls[0][-3:] == ["benchmark-image", "bash", "run_tests.sh"]
     assert "/workspace/translated_projects/Java/Python/example" in calls[0]
+
+
+def test_rejects_zero_tests_executed_false_positive(tmp_path, monkeypatch):
+    dataset(tmp_path)
+    workdir = tmp_path / "translated_projects" / "Python" / "Java" / "example"
+    workdir.mkdir(parents=True)
+    (workdir / "run_tests.sh").write_text("mvn clean test", encoding="utf-8")
+
+    class CompletedZero:
+        returncode = 0
+        stdout = "[INFO] Results:\n[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n"
+        stderr = ""
+
+    monkeypatch.setattr("repo_translation.evaluation.subprocess.run", lambda args, **kwargs: CompletedZero())
+    result = run_benchmark_tests(tmp_path, workdir, "benchmark-image")
+    assert not result.passed
+    assert "executed 0 tests" in result.output

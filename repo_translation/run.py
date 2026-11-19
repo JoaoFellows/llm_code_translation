@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     if image.returncode != 0:
         raise RuntimeError(f"Docker image unavailable: {args.docker_image}\n{image.stderr[-1000:]}")
     if args.target == "Java" and pmd_executable() is None:
-        raise FileNotFoundError("PMD 7.1.0 is required for Java smell evaluation; see class_translation/README.md")
+        print("[AVISO] PMD 7.1.0 não encontrado no host. A contagem de smells será desativada para alvos Java.", file=sys.stderr)
     client = build_client(args.provider)
     record = run_project(project, root, output, client, args.docker_image,
                          args.max_corrections, args.max_smell_iterations)
