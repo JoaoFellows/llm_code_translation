@@ -1,0 +1,30 @@
+[
+  {
+    "client": "ScriptedChatClient",
+    "model": null,
+    "direction": "java_to_python",
+    "task_id": "counter",
+    "tests_passed": 2,
+    "tests_total": 2,
+    "status": "passed",
+    "smells_after_translation": 5,
+    "smells_after_correction": 6,
+    "smells_after_smell_graph": 5,
+    "correction_iterations": 1,
+    "smell_iterations": 3
+  },
+  {
+    "client": "ScriptedChatClient",
+    "model": null,
+    "direction": "python_to_java",
+    "task_id": "box",
+    "tests_passed": 2,
+    "tests_total": 2,
+    "status": "passed",
+    "smells_after_translation": 0,
+    "smells_after_correction": 1,
+    "smells_after_smell_graph": 0,
+    "correction_iterations": 1,
+    "smell_iterations": 1
+  }
+]
