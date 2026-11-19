@@ -1,4 +1,8 @@
 .env
+.venv/
+.runtime/
+benchmarks/
+example*.zip
 .pytest_cache/
 pytest-cache-files-*/
 __pycache__/
