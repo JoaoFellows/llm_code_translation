@@ -12,7 +12,7 @@ O corte traduz uma classe Java inteira para Python, repara até os testes passar
   - Correção: roda o `unittest`. Se falha, pede reparo e volta a testar, até 3 vezes. Para antes se todos os testes passam.
   - Smells: roda o Pylint. Aceita o refactor só se a contagem cai e os testes continuam passando. Se o teste quebra, ou a contagem não cai, restaura o último snapshot que passava e tenta de novo, até 3 vezes.
 - Se a correção termina com algum teste falhando, o grafo de smells não roda.
-- O estado guarda `source_lang` e `target_lang`. A direção Python para Java cabe nesse estado e ainda não é executada.
+- O estado guarda `source_lang` e `target_lang`. As duas direções rodam: Java para Python e Python para Java.
 - O cliente de chat é compatível com a API da OpenAI. Os presets leem a chave de `.env`: OpenAI, OpenRouter, DeepSeek, Gemini e Ollama. O arquivo `.env` está no `.gitignore`.
 - Há um cliente falso, sem rede, usado pelo `pytest`. Os 15 testes em `class_translation/tests/` cobrem a tradução, o loop de correção, o rollback do grafo de smells e o registro da tarefa.
 - O loader `class_translation/classeval.py` lê uma tarefa do [ClassEval-T](https://github.com/wLinHoo/ClassEval-T) (clone em `CLASSEVAL_T_PATH`) e monta o mesmo `ClassTask` do fixture local. Os comandos são `python -m class_translation.run_classeval` e `python -m class_translation.run_classeval_batch`.
@@ -27,17 +27,25 @@ Seis classes não passaram em teste nenhum: `BookManagementDB`, `CSVProcessor`, 
 
 O registro por classe está em `class_translation/results/classeval_gemini.jsonl`.
 
+### Rodada Python para Java
+
+O mesmo modelo, Gemini `gemini-3.5-flash-lite`, traduziu as 94 classes no sentido contrário. O comando é `python -m class_translation.run_classeval_java --all`. Ele usa só o Gemini e grava em `class_translation/results/classeval_gemini_py2java.jsonl`. Classe já presente nesse arquivo é pulada. `AvgPartition` entrou antes do lote (12 de 12, zero smells). O oráculo é o JUnit, com `javac`. A contagem de smells é o PMD.
+
+Das 94 classes, 52 passaram em todos os testes (55,3%) e 42 ficaram com alguma falha depois das três voltas de correção. Vinte passaram já na tradução inicial (21,3%). Trinta e duas só passaram depois do reparo. A correção levou o total de 20 para 52.
+
+Nas que passaram, a média de smells foi 1,7 depois da tradução, 2,5 depois da correção e 0,9 depois do grafo de smells. A correção aumentou a contagem em 16 classes, não diminuiu em nenhuma e deixou 36 iguais. O grafo de smells baixou a contagem em 17, empatou em 35 e não aumentou em nenhuma. A correção usou cerca de uma volta (0,96). O grafo de smells usou 1,2 volta. Nas 35 em que a contagem não caiu, o refactor foi recusado ou a classe já estava sem smell.
+
+Das 42 que falharam, 32 não compilaram, então a suíte não chegou a rodar: `AccessGatewayFilter`, `ArgumentParser`, `ArrangementCalculator`, `AssessmentSystem`, `BinaryDataProcessor`, `BookManagementDB`, `BoyerMooreSearch`, `CSVProcessor`, `CalendarUtil`, `CamelCaseMap`, `Classroom`, `CombinationCalculator`, `CookiesUtil`, `CurrencyConverter`, `DataStatistics4`, `ExcelProcessor`, `ExpressionCalculator`, `HRManagementSystem`, `JSONProcessor`, `MetricsCalculator2`, `MovieBookingSystem`, `MusicPlayer`, `NLPDataProcessor2`, `PushBoxGame`, `RegexUtils`, `SQLGenerator`, `StockPortfolioTracker`, `TriCalculator`, `TwentyFourPointGame`, `UserLoginDB`, `WeatherSystem` e `XMLProcessor`.
+
+Dez compilaram e ficaram incompletas. Três não passaram em teste nenhum: `DatabaseProcessor` (0/4), `MovieTicketDB` (0/16) e `StudentDatabaseProcessor` (0/16). Sete passaram em parte: `AutomaticGuitarSimulator` (12/14), `EmailClient` (17/20), `Hotel` (18/23), `PageUtil` (15/16), `Server` (14/26), `ShoppingCart` (22/23) e `Warehouse` (29/32).
+
+Na ida, o mesmo modelo fechou 55 de 94 (58,5%). A taxa é próxima. A contagem de smells não se compara direto: a ida usa Pylint e a volta usa PMD. Nas duas direções a correção sobe a média de smells e o grafo seguinte desce, sem aumentar a contagem em classe nenhuma que já passava.
+
 ## Próximos passos
 
 ### Python para Java
 
-Mesmos dois grafos, no nível de classe. O que troca é o executor da linguagem de destino:
-
-- o prompt pede Java
-- o oráculo passa a ser o JUnit do ClassEval-T, com `javac`
-- a contagem de smells passa a ser o PMD, no mesmo papel do Pylint
-
-O modelo continua traduzindo só a classe. A suíte Java do benchmark julga a tradução. Isso vem antes de repositório, porque a forma dos grafos permanece e só o comando de teste e o linter mudam.
+A rodada das 94 classes está registrada acima. O que troca em relação à ida é o executor: o prompt pede Java, o oráculo é o JUnit com `javac`, e a contagem de smells é o PMD.
 
 ### Repositórios
 
@@ -49,7 +57,7 @@ O dataset também muda. ClassEval-T é classe. Repositório pede um benchmark de
 
 ### Ordem
 
-1. Python para Java nas classes do ClassEval-T.
+1. Python para Java nas classes do ClassEval-T. Feito, com o Gemini, nas 94 classes.
 2. Repositório, reusando os dois grafos em cima de um diretório.
 3. Quando houver crédito na OpenAI, ou outro provedor, repetir uma amostra das 94 classes para comparar modelos. O registro já tem o formato dessa comparação.
 

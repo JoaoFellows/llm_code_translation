@@ -70,4 +70,7 @@ Maven não é necessário. Sem o `javac`, sem esses jars ou sem o binário do PM
 ```powershell
 python -m class_translation.run_classeval_java
 python -m class_translation.run_classeval_java AvgPartition
+python -m class_translation.run_classeval_java --all
 ```
+
+`--all` percorre as 94 classes com o Gemini (`GEMINI_API_KEY`) e anexa cada linha no mesmo jsonl. Classe já gravada é pulada, então a bateria pode ser interrompida e retomada.
